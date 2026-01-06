@@ -6,8 +6,10 @@ This creates a FastAPI web service that stays running and handles requests.
 
 import base64
 import io
+import os
 
 import modal
+from fastapi import HTTPException, Request
 
 app = modal.App("hunyuan3d-omni-api")
 
@@ -228,9 +230,11 @@ class Hunyuan3DModel:
         }
 
 
-@app.function(image=image, timeout=7200)
+@app.function(
+    image=image, timeout=1200, secrets=[modal.Secret.from_name("hunyuan3d-api")]
+)
 @modal.fastapi_endpoint(method="POST")
-def generate_3d(request: dict):
+def generate_3d(request: dict, http_request: Request):
     """
     Web endpoint for 3D generation with optional PBR texturing.
 
@@ -247,6 +251,12 @@ def generate_3d(request: dict):
         "textured": true
     }
     """
+    api_key = os.environ.get("HUNYUAN3D_API_KEY")
+    if not api_key:
+        raise HTTPException(status_code=500, detail="Server auth not configured")
+    auth_header = http_request.headers.get("authorization", "")
+    if auth_header != f"Bearer {api_key}":
+        raise HTTPException(status_code=401, detail="Unauthorized")
 
     image_bytes = base64.b64decode(request["image"])
     bbox = request["bbox"]
