@@ -64,3 +64,6 @@ torchmetrics==1.6.0
 
 # Optional
 pydantic==2.10.6
+
+# Serving
+modal
