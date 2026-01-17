@@ -13,6 +13,9 @@ from fastapi import HTTPException, Request
 
 app = modal.App("hunyuan3d-omni-api")
 
+# Default bbox is [length, height, width] in range 0~1.
+DEFAULT_BBOX = (0.8, 0.64, 1.0)
+
 image = (
     modal.Image.from_registry("nvidia/cuda:12.4.1-devel-ubuntu22.04", add_python="3.10")
     .apt_install(
@@ -161,7 +164,7 @@ class Hunyuan3DModel:
 
     @modal.method()
     def generate(
-        self, image_bytes: bytes, bbox: list[float], add_texture: bool = True
+        self, image_bytes: bytes, bbox: list[float] | None = None, add_texture: bool = True
     ) -> dict:
         """Generate 3D model from image and bbox, optionally with PBR textures."""
         import os
@@ -180,6 +183,8 @@ class Hunyuan3DModel:
         image = Image.open(io.BytesIO(image_bytes))
         image.save(temp_image_path)
 
+        if bbox is None:
+            bbox = DEFAULT_BBOX
         bbox_tensor = torch.FloatTensor(bbox).unsqueeze(0).unsqueeze(0)
         bbox_tensor = bbox_tensor.to(self.shape_pipeline.device).to(
             self.shape_pipeline.dtype
@@ -241,7 +246,7 @@ def generate_3d(request: dict, http_request: Request):
     POST /generate_3d
     Body: {
         "image": "base64_encoded_image",
-        "bbox": [x, y, z],  // e.g., [0.8, 0.64, 1.0]
+        "bbox": [x, y, z],  // optional, defaults to [0.8, 0.64, 1.0]
         "add_texture": true  // optional, default true - adds PBR materials (albedo, metallic, roughness)
     }
 
@@ -259,7 +264,11 @@ def generate_3d(request: dict, http_request: Request):
         raise HTTPException(status_code=401, detail="Unauthorized")
 
     image_bytes = base64.b64decode(request["image"])
-    bbox = request["bbox"]
+    bbox = request.get("bbox")
+    if bbox is None:
+        bbox = list(DEFAULT_BBOX)
+    elif not isinstance(bbox, list) or len(bbox) != 3:
+        raise HTTPException(status_code=400, detail="bbox must be [length, height, width]")
     add_texture = request.get("add_texture", True)
 
     model = Hunyuan3DModel()
