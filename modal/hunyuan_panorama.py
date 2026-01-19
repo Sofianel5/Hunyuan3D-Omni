@@ -44,7 +44,6 @@ class HunyuanPanorama:
         import torch
 
         os.environ["HF_HOME"] = "/cache/huggingface"
-        os.environ["TRANSFORMERS_CACHE"] = "/cache/huggingface"
 
         from diffusers import FluxPipeline
         from huggingface_hub import hf_hub_download
@@ -64,7 +63,7 @@ class HunyuanPanorama:
         # Download and load LoRA weights
         lora_path = hf_hub_download(
             repo_id="tencent/HunyuanWorld-1",
-            filename="Text/pytorch_lora_weights.safetensors",
+            filename="HunyuanWorld-PanoDiT-Text/lora.safetensors",
             cache_dir="/cache/huggingface",
         )
         self.pipe.load_lora_weights(lora_path)
@@ -133,7 +132,7 @@ class HunyuanPanorama:
 
 
 @app.function(timeout=600)
-@modal.web_endpoint(method="POST")
+@modal.fastapi_endpoint(method="POST")
 def generate_panorama(item: dict) -> dict:
     """
     HTTP endpoint for panorama generation.
